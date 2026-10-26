@@ -1,0 +1,64 @@
+{
+  "admin": [
+    {
+      "id": "protocol-qq",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "qq" }
+    },
+    {
+      "id": "model-deepseek",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "models" }
+    },
+    {
+      "id": "model-typesafe",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "models" }
+    },
+    {
+      "id": "model-openai",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "models" }
+    },
+    {
+      "id": "model-local",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "models" }
+    },
+    {
+      "id": "storage-sqlite",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "system" }
+    },
+    {
+      "id": "memory-memstation",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "memory" }
+    },
+    {
+      "id": "tool-web-deepseek",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "web" }
+    },
+    {
+      "id": "tool-stickers",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "stickers" }
+    },
+    {
+      "id": "tool-node",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "sandbox" }
+    },
+    {
+      "id": "safety-decisions",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "safety" }
+    },
+    {
+      "id": "behavior-scheduled",
+      "entry": "apps/dashboard/src/lib/plugins/BuiltinAdmin.svelte",
+      "props": { "section": "tasks" }
+    }
+  ]
+}
