@@ -1,0 +1,27 @@
+name: Bug report
+description: 报告可复现的问题
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 提交或版本
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: 操作系统、Node.js、部署方式和相关插件。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现与预期行为
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 日志或截图
+      description: 隐去真实聊天、Key、内部 token 和私有服务地址；安全漏洞请使用私密报告入口。
