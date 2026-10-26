@@ -1,0 +1,50 @@
+{
+  "name": "mimic",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A TypeScript chatbot framework that knows when to join a conversation.",
+  "license": "Apache-2.0",
+  "author": "BackRunner",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/backrunner/mimic.git"
+  },
+  "homepage": "https://github.com/backrunner/mimic#readme",
+  "bugs": {
+    "url": "https://github.com/backrunner/mimic/issues"
+  },
+  "type": "module",
+  "packageManager": "pnpm@12.3.4",
+  "engines": {
+    "node": ">=24.21.0"
+  },
+  "scripts": {
+    "dev": "tsx apps/daemon/src/index.ts",
+    "dev:dashboard": "node scripts/generate-admin.mjs && pnpm --dir apps/dashboard dev",
+    "build:core": "tsc -p tsconfig.build.json && node scripts/copy-assets.mjs",
+    "build": "node scripts/generate-admin.mjs && pnpm build:core && pnpm --dir apps/dashboard build",
+    "start": "node scripts/start.mjs",
+    "check": "node scripts/generate-admin.mjs && tsc --noEmit && pnpm --dir apps/dashboard check",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "replay": "tsx scripts/replay.ts",
+    "container:dev": "node scripts/apple-container.mjs up",
+    "container:down": "node scripts/apple-container.mjs down",
+    "format": "prettier --write packages plugins apps scripts tests *.json *.ts *.yaml",
+    "sandbox:verify": "node scripts/verify-sandbox.mjs"
+  },
+  "dependencies": {
+    "cron-parser": "5.10.2",
+    "drizzle-orm": "0.45.4",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "prettier": "3.9.10",
+    "prettier-plugin-svelte": "^4.1.1",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.5"
+  }
+}

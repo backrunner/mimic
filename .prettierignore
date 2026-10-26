@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+.agents
+.artifacts
+pnpm-lock.yaml
+apps/dashboard/build
+apps/dashboard/.svelte-kit
+apps/dashboard/src/lib/plugins/registry.generated.ts

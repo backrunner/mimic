@@ -1,0 +1,47 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+.svelte-kit/
+.vite/
+.cache/
+coverage/
+*.tsbuildinfo
+apps/dashboard/src/lib/plugins/registry.generated.ts
+
+# Local state, credentials, backups, and deployment connections
+/data/
+/backups/
+.env
+.env.*
+!.env.example
+!**/.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.key
+*.pem
+*.p12
+*.pfx
+*.token
+.npmrc.local
+
+# Private planning, research, logs, and test evidence
+/.agents/
+/.artifacts/
+test-results/
+playwright-report/
+blob-report/
+*.log
+*.log.*
+
+# Editor and operating system files
+.idea/
+.vscode/
+.DS_Store
+._*
+Thumbs.db
+*~
+*.swp
+*.swo

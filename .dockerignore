@@ -1,0 +1,16 @@
+node_modules
+**/node_modules
+dist
+**/build
+**/.svelte-kit
+.git
+.env*
+data
+.artifacts
+test-results
+playwright-report
+.agents
+*.log
+.DS_Store
+docs/images
+coverage

@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": [
+    "apps/daemon/**/*.ts",
+    "packages/**/*.ts",
+    "plugins/**/*.ts",
+    "examples/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", "tests"]
+}

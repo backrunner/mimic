@@ -1,0 +1,22 @@
+{
+  "@esbuild/darwin-arm64": {
+    "file": "LICENSES/upstream/esbuild-darwin-arm64.txt",
+    "source": "https://raw.githubusercontent.com/evanw/esbuild/f6058f8364fe7ab91ca57a83e02577ed74c9cae4/LICENSE.md"
+  },
+  "@polka/url": {
+    "file": "LICENSES/upstream/polka-url.txt",
+    "source": "https://raw.githubusercontent.com/lukeed/polka/c36cf8b5d1a57164e64fdd7d4e0d0f80ab262dc0/license"
+  },
+  "@rolldown/binding-darwin-arm64": {
+    "file": "LICENSES/upstream/rolldown-binding-darwin-arm64.txt",
+    "source": "https://raw.githubusercontent.com/rolldown/rolldown/841078d84f8d1f604408f2d12e075430d2fab97a/LICENSE"
+  },
+  "sirv": {
+    "file": "LICENSES/upstream/sirv.txt",
+    "source": "https://raw.githubusercontent.com/lukeed/sirv/1135207e92c40354543cbd15c763c7a61d79d432/license"
+  },
+  "drizzle-orm": {
+    "file": "LICENSES/upstream/drizzle-orm.txt",
+    "source": "https://raw.githubusercontent.com/drizzle-team/drizzle-orm/eab8bedbb65d5429c54e612ddbd88aa23091d398/LICENSE"
+  }
+}
