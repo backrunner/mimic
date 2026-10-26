@@ -1,0 +1,36 @@
+import type { PluginManifest } from '../../contracts/src/index.js';
+export const catalog: PluginManifest[] = [
+  ['protocol-qq', 'QQ 官方机器人', 'protocol', 'qq', ['protocol.send']],
+  ['model-deepseek', 'DeepSeek', 'model', 'models', ['ai.chat']],
+  ['model-typesafe', 'TypeSafe · Jev', 'model', 'models', ['ai.participation']],
+  ['model-openai', 'OpenAI Decisions', 'model', 'models', ['ai.participation']],
+  [
+    'model-local',
+    '本地模型',
+    'model',
+    'models',
+    ['ai.chat', 'ai.participation'],
+  ],
+  ['storage-sqlite', 'SQLite · Drizzle', 'storage', 'system', []],
+  ['memory-memstation', 'MemStation', 'memory', 'memory', ['memory.read']],
+  ['tool-web-deepseek', '网页搜索', 'tool', 'web', ['ai.web-search']],
+  ['tool-stickers', '表情素材', 'tool', 'stickers', ['data.read']],
+  ['tool-node', 'Node.js 沙箱', 'tool', 'sandbox', []],
+  ['safety-decisions', '决策安全层', 'safety', 'safety', ['ai.safety']],
+  [
+    'behavior-scheduled',
+    '定时行为',
+    'behavior',
+    'tasks',
+    ['data.read', 'data.write'],
+  ],
+].map(([id, name, kind, admin, permissions]) => ({
+  id: id as string,
+  name: name as string,
+  kind: kind as PluginManifest['kind'],
+  admin: admin as string,
+  permissions: permissions as string[],
+  version: '0.1.0',
+  dependencies: [],
+  trust: 'builtin',
+}));
