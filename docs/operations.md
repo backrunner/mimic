@@ -26,3 +26,24 @@
 重启先全量处理遗留状态，再开放协议摄取：发送中与待确认用量标记 unknown；运行记录根据投递状态结束，未发送的运行取消。不自动重发未知网络请求，也不把未知用量补成零。
 
 cron/随机任务的 nextAt、抽样结果、occurrence 与租约落盘，错过任务按 skip/coalesce 处理。行为只提出意图，不能绕过参与决策或安全流水线。
+
+## 上下文预算与延迟排查
+
+运行记录的 `context` 阶段记录历史/记忆条数及序列化字符数，不记录额外聊天副本。用量记录的 `requestChars` 是实际发送的 JSON 请求长度，`durationMs` 是该次 AI 请求耗时，`inputTokens` 仅采用厂商报告。比较相同模型和相似聊天场景下的调用次数、请求体积、端到端耗时与 p50/p95；本地模拟 provider 的耗时不能代替线上延迟。
+
+默认 `context` 配置：
+
+```json
+{
+  "historyMessages": 16,
+  "historyChars": 6000,
+  "decisionMessages": 8,
+  "decisionChars": 4000,
+  "memoryItems": 3,
+  "memoryChars": 1800,
+  "toolResultChars": 4000,
+  "maxPromptChars": 24000
+}
+```
+
+优先保持人格简短、记忆条目完整、引用清晰。`prompt_budget_exceeded` 表示生成请求超过总限额；`context_trigger_too_large` / `input_budget_exceeded` 表示当前消息无法在上下文或完整输入审查预算内处理。缩短长消息或冗长人格，不通过关闭安全审查来减少开销。

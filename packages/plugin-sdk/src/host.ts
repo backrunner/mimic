@@ -10,6 +10,8 @@ import type {
   StorageProvider,
   MemoryProvider,
   MemoryTransport,
+  ToolExecutionScope,
+  Config,
 } from '../../contracts/src/index.js';
 import type { AIRuntime } from '../../ai-runtime/src/index.js';
 import type { ConversationEngine } from '../../core/src/engine.js';
@@ -24,12 +26,25 @@ import {
 export type ExecutionContext = PluginServices & {
   readonly scope: Readonly<Scope>;
 };
+export type ToolExecutionContext = ExecutionContext &
+  Pick<ToolExecutionScope, 'request' | 'results'>;
+export type SafetyExecutionContext = ExecutionContext & {
+  readonly policy: Readonly<Config['safety'] & { revision: number }>;
+  audit(
+    event: 'verdict' | 'unavailable' | 'reused',
+    detail: Record<string, unknown>,
+  ): Promise<void>;
+};
 export interface PluginRegistrar {
   memory(provider: MemoryTransport): void;
   model(provider: ModelProvider): void;
   tool(
-    tool: Omit<ToolPlugin, 'execute'> & {
-      execute(input: unknown, context: ExecutionContext): Promise<unknown>;
+    tool: Omit<ToolPlugin, 'execute' | 'authorize'> & {
+      authorize?(
+        input: unknown,
+        context: ToolExecutionContext,
+      ): void | Promise<void>;
+      execute(input: unknown, context: ToolExecutionContext): Promise<unknown>;
     },
   ): void;
   hook(
@@ -45,7 +60,7 @@ export interface PluginRegistrar {
       check(
         stage: string,
         subject: unknown,
-        context: ExecutionContext,
+        context: SafetyExecutionContext,
       ): ReturnType<SafetyProvider['check']>;
     },
   ): void;
@@ -114,12 +129,25 @@ export async function installPlugins(
         kind('tool');
         if (host.engine.tools.some((t) => t.name === tool.name))
           throw new Error('duplicate_tool');
+        const toolContext = (
+          scope: ToolExecutionScope,
+        ): ToolExecutionContext => ({
+          ...context(scope),
+          request: Object.freeze(structuredClone(scope.request)),
+          results: structuredClone(scope.results),
+        });
         host.engine.tools.push({
           ...tool,
           pluginId: m.id,
+          authorize: tool.authorize
+            ? async (input, scope) => {
+                if (!enabled()) throw new Error('plugin_disabled');
+                await tool.authorize!(input, toolContext(scope));
+              }
+            : undefined,
           execute: async (input, scope) => {
             if (!enabled()) throw new Error('plugin_disabled');
-            return tool.execute(input, context(scope));
+            return tool.execute(input, toolContext(scope));
           },
         });
       },
@@ -137,10 +165,45 @@ export async function installPlugins(
         kind('safety');
         host.engine.safety = {
           id: m.id,
-          check: async (stage, subject, scope) =>
-            enabled()
-              ? safety.check(stage, subject, context(scope))
-              : { allow: false, reason: 'safety_plugin_disabled' },
+          check: async (stage, subject, scope) => {
+            if (!enabled())
+              return { allow: false, reason: 'safety_plugin_disabled' };
+            const revision = host.state.revision;
+            const signal = AbortSignal.any([
+              scope.signal,
+              host.state.configSignal,
+            ]);
+            signal.throwIfAborted();
+            let onAbort: (() => void) | undefined;
+            try {
+              const result = await Promise.race([
+                safety.check(stage, structuredClone(subject), {
+                  ...context({ ...scope, signal }),
+                  policy: Object.freeze({
+                    ...host.state.config.safety,
+                    revision,
+                  }),
+                  audit: (event, detail) =>
+                    host.state.audit(
+                      `safety.${event}`,
+                      { ...detail, providerId: m.id },
+                      scope.workspaceId,
+                    ),
+                }),
+                new Promise<never>((_, reject) => {
+                  onAbort = () => reject(new Error('safety_cancelled'));
+                  signal.addEventListener('abort', onAbort, { once: true });
+                  if (signal.aborted) onAbort();
+                }),
+              ]);
+              signal.throwIfAborted();
+              if (!enabled() || host.state.revision !== revision)
+                return { allow: false, reason: 'safety_snapshot_changed' };
+              return result;
+            } finally {
+              if (onAbort) signal.removeEventListener('abort', onAbort);
+            }
+          },
         };
       },
       protocol(adapter) {

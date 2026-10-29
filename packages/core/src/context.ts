@@ -4,6 +4,7 @@ import type {
   Scope,
 } from '../../contracts/src/index.js';
 import { State, hash } from './state.js';
+import { selectMessages, conversationMessage } from './prompt.js';
 
 /** Verdicts are revision-bound. Denied history is never returned to decision/text models. */
 export async function screenedContext(
@@ -15,22 +16,37 @@ export async function screenedContext(
   const rows = (
     await state.db.list<Message>('message', scope.workspaceId, 60)
   ).reverse();
-  let remaining = 24000;
-  const candidates = rows
-    .map((r) => r.value)
-    .filter((m) => m.kind !== 'deleted')
-    .reverse()
-    .filter((m) => {
-      const size = m.text.length + (m.quote?.text.length ?? 0);
-      if (size > remaining) return false;
-      remaining -= size;
-      return true;
-    })
-    .reverse();
+  const selected = selectMessages(
+    rows.map((r) => r.value).filter((m) => m.kind !== 'deleted'),
+    trigger,
+    state.config.context.historyMessages,
+    state.config.context.historyChars,
+  );
+  // Safety sees full source text, even where the conversational view is clipped.
+  // Bound that workload too, while always reserving the current message first.
+  let screeningChars = 32000;
+  const included = new Set<string>();
+  for (const message of [
+    ...selected.filter((m) => m.id === trigger.id),
+    ...selected.toReversed().filter((m) => m.id !== trigger.id),
+  ]) {
+    const size = JSON.stringify({
+      ...conversationMessage(message),
+      text: message.text,
+      quote: message.quote,
+    }).length;
+    if (size > screeningChars) {
+      if (message.id === trigger.id) throw new Error('input_budget_exceeded');
+      continue;
+    }
+    screeningChars -= size;
+    included.add(message.id);
+  }
+  const candidates = selected.filter((m) => included.has(m.id));
   const signatures = new Map(
     candidates.map((m) => [
       m.id,
-      hash([m.revision, m.text, m.quote, state.revision, safety.id]),
+      hash(['context-v2', m, state.revision, safety.id]),
     ]),
   );
   const policyRows = await Promise.all(
@@ -80,7 +96,11 @@ export async function screenedContext(
   if (known(current) === undefined) {
     const verdict = await safety.check(
       'input.pre',
-      { text: current.text, quote: current.quote },
+      {
+        ...conversationMessage(current),
+        text: current.text,
+        quote: current.quote,
+      },
       scope,
     );
     if (verdict.reason === 'safety_unavailable')
@@ -89,30 +109,22 @@ export async function screenedContext(
   }
   if (!known(current))
     return { messages: [], allow: false, reason: 'input_denied' };
-  const pending = candidates.filter(
-    (m) => !(m.bot && m.actorId === 'bot') && known(m) === undefined,
-  );
+  const pending = candidates.filter((m) => known(m) === undefined);
   if (pending.length) {
     const verdict = await safety.check(
       'input.history',
-      pending.map((m) => ({ id: m.id, text: m.text, quote: m.quote })),
+      pending.map((m) => ({
+        ...conversationMessage(m),
+        text: m.text,
+        quote: m.quote,
+      })),
       scope,
     );
     if (verdict.reason === 'safety_unavailable')
       return { messages: [], ...verdict };
     await store(pending, verdict.allow);
   }
-  let budget = 24000;
-  const messages = candidates
-    .filter((m) => (m.bot && m.actorId === 'bot') || known(m))
-    .reverse()
-    .filter((m) => {
-      const size = m.text.length + (m.quote?.text.length ?? 0);
-      if (size > budget) return false;
-      budget -= size;
-      return true;
-    })
-    .reverse();
+  const messages = candidates.filter((m) => known(m));
   const byReference = new Map(
     messages
       .filter((m) => m.protocol?.referenceId)

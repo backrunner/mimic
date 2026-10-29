@@ -1,10 +1,7 @@
 import { z } from 'zod';
 import { lookup } from 'node:dns/promises';
 import { isIP, BlockList } from 'node:net';
-import type {
-  Scope,
-  ToolPlugin,
-} from '../../../packages/contracts/src/index.js';
+import type { ToolPlugin } from '../../../packages/contracts/src/index.js';
 import { State, uid } from '../../../packages/core/src/state.js';
 import {
   AIRuntime,
@@ -84,7 +81,7 @@ export function createTools(state: State, ai: AIRuntime): ToolPlugin[] {
     effect,
     execute,
   });
-  return [
+  const tools: ToolPlugin[] = [
     make(
       'web_search',
       '搜索公开网页，适用于需要最新事实的问题。不要发送私人聊天、ID 或凭据。',
@@ -162,18 +159,113 @@ export function createTools(state: State, ai: AIRuntime): ToolPlugin[] {
       },
     ),
   ];
+  for (const tool of tools) {
+    tool.pluginId = tool.name.startsWith('web_')
+      ? 'tool-web-deepseek'
+      : tool.name.startsWith('stickers_')
+        ? 'tool-stickers'
+        : 'tool-node';
+    tool.available = () =>
+      tool.pluginId === 'tool-web-deepseek'
+        ? state.config.tools.web
+        : tool.pluginId === 'tool-stickers'
+          ? state.config.tools.stickers
+          : state.config.tools.node;
+  }
+  const search = tools.find((tool) => tool.name === 'web_search')!;
+  search.projectResult = projectSearchResult;
+  const fetchTool = tools.find((tool) => tool.name === 'web_fetch')!;
+  fetchTool.authorize = (input, scope) => {
+    const allowed = requestUrls(scope.request.text);
+    for (const prior of scope.results)
+      if (prior.name === search.name)
+        for (const url of searchResultUrls(prior.result)) allowed.add(url);
+    if (!allowed.has(new URL((input as { url: string }).url).toString()))
+      throw new Error('fetch_url_not_authorized');
+  };
+  tools.find((tool) => tool.name === 'stickers_search')!.assetIds = (value) =>
+    Array.isArray(value)
+      ? value.flatMap((asset) =>
+          typeof asset?.id === 'string' ? [asset.id] : [],
+        )
+      : [];
+  return tools;
 }
-export function availableTools(state: State, tools: ToolPlugin[]) {
-  const c = state.config;
-  return tools.filter((t) =>
-    t.pluginId
-      ? !c.disabledPlugins.includes(t.pluginId)
-      : t.name.startsWith('web_')
-        ? c.tools.web && !c.disabledPlugins.includes('tool-web-deepseek')
-        : t.name.startsWith('stickers_')
-          ? c.tools.stickers && !c.disabledPlugins.includes('tool-stickers')
-          : c.tools.node &&
-            c.safety.mode === 'enforce' &&
-            !c.disabledPlugins.includes('tool-node'),
-  );
+
+/** A model may fetch an exact user URL or a URL returned by this run's search. */
+export function requestUrls(text: string) {
+  const urls = new Set<string>();
+  for (const match of text.matchAll(/https?:\/\/[^\s<>"'`，。！？）]+/g)) {
+    try {
+      urls.add(new URL(match[0].replace(/[),.;!?]+$/, '')).toString());
+    } catch {}
+  }
+  return urls;
+}
+
+export function searchResultUrls(value: unknown) {
+  const urls = new Set<string>();
+  const result = value as {
+    results?: { url?: unknown; link?: unknown }[];
+  } | null;
+  if (!Array.isArray(result?.results)) return urls;
+  for (const row of result.results.slice(0, 5)) {
+    const url = row?.url ?? row?.link;
+    if (typeof url !== 'string') continue;
+    try {
+      const parsed = new URL(url);
+      if (
+        ['https:', 'http:'].includes(parsed.protocol) &&
+        !parsed.username &&
+        !parsed.password
+      )
+        urls.add(parsed.toString());
+    } catch {}
+  }
+  return urls;
+}
+
+function clip(text: string, limit: number) {
+  return text.length <= limit ? text : text.slice(0, limit) + '…[truncated]';
+}
+
+export function projectSearchResult(value: unknown, maxChars: number): unknown {
+  const search = value as { results?: unknown[] } | null;
+  if (Array.isArray(search?.results)) {
+    const results: { url: string; title: string; snippet: string }[] = [];
+    let truncated = search.results.length > 5;
+    for (const raw of search.results.slice(0, 5)) {
+      if (!raw || typeof raw !== 'object') {
+        truncated = true;
+        continue;
+      }
+      const row = raw as Record<string, unknown>;
+      const url = row.url ?? row.link;
+      if (typeof url !== 'string') {
+        truncated = true;
+        continue;
+      }
+      const title = typeof row.title === 'string' ? row.title : '';
+      const summary = row.snippet ?? row.description ?? row.content;
+      const snippet = typeof summary === 'string' ? summary : '';
+      truncated ||= title.length > 160 || snippet.length > 400;
+      const projected = {
+        url,
+        title: clip(title, 160),
+        snippet: clip(snippet, 400),
+      };
+      const candidate = JSON.stringify({
+        untrusted: true,
+        result: { results: [...results, projected], truncated: false },
+      });
+      if (candidate.length > maxChars) {
+        truncated = true;
+        continue;
+      }
+      results.push(projected);
+    }
+    return { results, truncated };
+  }
+
+  return value;
 }

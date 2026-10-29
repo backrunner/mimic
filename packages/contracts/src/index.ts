@@ -94,6 +94,7 @@ export interface Usage {
   cacheTokens?: number;
   units?: number;
   durationMs: number;
+  requestChars?: number;
   at: number;
   error?: string;
   providerRequestId?: string;
@@ -307,13 +308,25 @@ export interface MemoryTransport {
     scope: MemoryOperationScope,
   ): Promise<Record<string, any>>;
 }
+export interface ToolExecutionScope extends Scope {
+  readonly request: Readonly<{
+    speaker: string;
+    text: string;
+    proposal?: string;
+  }>;
+  readonly results: readonly { name: string; result: unknown }[];
+}
 export interface ToolPlugin {
   pluginId?: string;
   name: string;
   definition: ToolDefinition;
   schema: z.ZodType;
   effect: 'read' | 'network' | 'compute' | 'propose_send';
-  execute(input: unknown, scope: Scope): Promise<unknown>;
+  available?(): boolean;
+  authorize?(input: unknown, scope: ToolExecutionScope): void | Promise<void>;
+  projectResult?(value: unknown, maxChars: number): unknown;
+  assetIds?(value: unknown): string[];
+  execute(input: unknown, scope: ToolExecutionScope): Promise<unknown>;
 }
 export interface Hook {
   id: string;
@@ -446,6 +459,27 @@ export const configSchema = z
     connections: z.array(connectionSchema).max(30).default([]),
     routes: z.record(z.string(), routeSchema).default({}),
     memory: memoryConfigSchema.default(() => memoryConfigSchema.parse({})),
+    context: z
+      .object({
+        historyMessages: z.number().int().min(2).max(40).default(16),
+        historyChars: z.number().int().min(4000).max(16000).default(6000),
+        decisionMessages: z.number().int().min(2).max(16).default(8),
+        decisionChars: z.number().int().min(4000).max(10000).default(4000),
+        memoryItems: z.number().int().min(1).max(10).default(3),
+        memoryChars: z.number().int().min(200).max(6000).default(1800),
+        toolResultChars: z.number().int().min(500).max(8000).default(4000),
+        maxPromptChars: z.number().int().min(12000).max(48000).default(24000),
+      })
+      .default(() => ({
+        historyMessages: 16,
+        historyChars: 6000,
+        decisionMessages: 8,
+        decisionChars: 4000,
+        memoryItems: 3,
+        memoryChars: 1800,
+        toolResultChars: 4000,
+        maxPromptChars: 24000,
+      })),
     safety: z
       .object({
         mode: z.enum(['off', 'audit', 'enforce']).default('enforce'),

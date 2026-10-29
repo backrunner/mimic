@@ -18,7 +18,8 @@ describe('conversation pipeline', () => {
       expect(runs[0]!.value.draft).toContain('事务');
       expect(await app.db.list('send')).toHaveLength(0);
       const usage = await app.db.list<Usage>('usage');
-      expect(usage.length).toBeGreaterThanOrEqual(5);
+      expect(usage).toHaveLength(4);
+      expect(usage.every((r) => (r.value.requestChars ?? 0) > 0)).toBe(true);
       expect(usage.every((r) => r.value.status === 'reported')).toBe(true);
       expect(new Set(usage.map((r) => r.value.connectionId))).toEqual(
         new Set(['fixture']),

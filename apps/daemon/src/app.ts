@@ -19,7 +19,7 @@ import {
   limitedJson,
 } from '../../../packages/ai-runtime/src/index.js';
 import { ConversationEngine } from '../../../packages/core/src/engine.js';
-import { DecisionSafety } from '../../../plugins/safety-decisions/src/index.js';
+import { createDecisionSafetyPlugin } from '../../../plugins/safety-decisions/src/index.js';
 import { disabledMemory } from '../../../plugins/memory-disabled/src/index.js';
 import { MemoryService } from '../../../packages/core/src/memory.js';
 import { MemStationTransport } from '../../../plugins/memory-memstation/src/index.js';
@@ -31,6 +31,7 @@ import {
   qqChallenge,
 } from '../../../plugins/protocol-qq/src/index.js';
 import { createTools } from '../../../plugins/tools/src/index.js';
+import { builtinModelProviders } from '../../../plugins/models/src/index.js';
 import {
   Scheduler,
   preview,
@@ -52,6 +53,7 @@ import {
   type ProtocolAdapter,
   type StorageProvider,
   type MemoryProvider,
+  type SafetyProvider,
   type RecordEntry,
   scheduleSchema,
 } from '../../../packages/contracts/src/index.js';
@@ -108,8 +110,14 @@ export async function createApp(
     }
     if (!token.trim()) throw new Error('internal_token_empty');
     const ai = new AIRuntime(state, options.fetcher),
-      safety = new DecisionSafety(ai, state),
+      safety: SafetyProvider = {
+        id: 'unconfigured',
+        async check() {
+          return { allow: false, reason: 'safety_unconfigured' };
+        },
+      },
       qq = new QQAdapter(state, options.fetcher);
+    builtinModelProviders.forEach((provider) => ai.register(provider));
     const memory: MemoryService = new MemoryService(state, () => engine.safety);
     memory.register(
       new MemStationTransport(
@@ -163,9 +171,10 @@ export async function createApp(
       await memory.close();
       await memoryBroker.close();
     };
+    const defaultSafety = createDecisionSafetyPlugin();
     const plugins = options.plugins ?? [];
     await installPlugins(
-      plugins,
+      [defaultSafety, ...plugins],
       {
         state,
         db,
@@ -174,7 +183,7 @@ export async function createApp(
         engine,
         scheduler,
       },
-      catalog,
+      catalog.filter((manifest) => manifest.id !== defaultSafety.manifest.id),
     );
     const installedCatalog = [...catalog, ...plugins.map((p) => p.manifest)];
     for (const row of await memory.rows<any>('memory-broker'))

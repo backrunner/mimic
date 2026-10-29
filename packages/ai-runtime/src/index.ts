@@ -12,7 +12,6 @@ import type {
 import { State, uid, errorCode } from '../../core/src/state.js';
 const object = z.record(z.string(), z.unknown());
 const number = z.number().finite().nonnegative();
-import { builtinModelProviders } from '../../../plugins/models/src/index.js';
 export async function limitedJson(
   response: Response,
   maxBytes = 2 * 1024 * 1024,
@@ -57,9 +56,7 @@ export class AIRuntime {
   constructor(
     readonly state: State,
     readonly fetcher: typeof fetch = fetch,
-  ) {
-    builtinModelProviders.forEach((p) => this.register(p));
-  }
+  ) {}
   async #reserve(
     role: string,
     operation: string,
@@ -174,13 +171,15 @@ export class AIRuntime {
       )
         throw new Error('credential_missing');
       dispatched = true;
+      const body = JSON.stringify(spec.body);
+      usage.requestChars = body.length;
       const response = await this.fetcher(base + path, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           ...(key ? { authorization: `Bearer ${key}` } : {}),
         },
-        body: JSON.stringify(spec.body),
+        body,
         signal: AbortSignal.any([
           scope.signal,
           configSignal,
@@ -284,6 +283,11 @@ export class AIRuntime {
     tools: ToolDefinition[],
     scope: Scope,
   ): Promise<Generation> {
+    if (
+      JSON.stringify({ messages, tools }).length >
+      this.state.config.context.maxPromptChars
+    )
+      throw new Error('prompt_budget_exceeded');
     const { provider, options } = this.provider('chat');
     if (!provider.text) throw new Error('text_unsupported');
     const data = await this.request(

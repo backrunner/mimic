@@ -23,6 +23,36 @@
 - `memory.propose(candidate)`：独立声明 `memory.propose`；提交带来源与人物的候选，先过 Safety，再由记忆服务验证。它不批准事实或发布跨群副本；审核在 MemStation Manager 完成。
 - `scope`：当前 workspace/run/plugin 与 AbortSignal。合作式取消不是隔离边界。
 
+## 安全插件与 decision model
+
+默认 `safety-decisions` 也通过 `MimicPlugin.setup → registrar.safety` 安装；规则、判定问题、阈值解释与结果复用由插件实现。宿主传入 `SafetyExecutionContext`，包含上述作用域服务，以及只读的 `policy: {mode, threshold, revision}` 和 `audit(event, detail)`。审计入口由宿主绑定当前工作区及插件 ID，不需要插件访问核心 State 或数据库。宿主也负责中止等待、禁止停用后的调用和拒绝配置变化后的旧结果。
+
+安全插件声明 `ai.safety` 权限后，可调用 `context.ai.decide('safety', state, questions)`。`routes.safety` 独立选择 decision connection/model，不必跟聊天模型相同；内置模型插件支持原生 System One、Decisions，或结构化文本决策桥接。原生概率和桥接布尔结果仍由模型插件解码，连接、密钥、网络、取消、预算与用量由统一 AI Runtime 持有。插件不获得 provider Key、通用 HTTP 请求入口或 Runtime 对象。
+
+例如，角色配置可以分别指向聊天和决策连接：
+
+```json
+{
+  "routes": {
+    "chat": { "connectionId": "chat-connection", "model": "chat-model" },
+    "safety": {
+      "connectionId": "decision-connection",
+      "model": "decision-model"
+    }
+  }
+}
+```
+
+第三方安全实现沿用 `registrar.safety` 替换当前提供方。工具强制安全门禁检查的是当前提供方的 ID 和状态，不要求插件名为 `safety-decisions`。停用当前安全插件会拒绝检查；未声明 `ai.safety` 的插件不能调用安全决策路由。自定义提供方应实现所需的输入、记忆、工具、输出策略与 off/audit/enforce 行为，不能把格式正确或模型允许当作工具授权。
+
+## 工具扩展与核心边界
+
+工具可选择声明 `available()`、`authorize(input, context)`、`projectResult(value, maxChars)` 和 `assetIds(value)`。`ToolExecutionContext` 增加只读的原始 `request`，以及当前运行内已经审查并对模型可见的工具 `results` 副本；不能使用这两个字段切换工作区或获取其他运行的结果。
+
+核心固定执行：当前可用性及 effect 门禁 → 参数 schema → 插件授权 → 语义 Safety/hook → 执行 → 插件结果投影 → 核心序列化限额 → Safety/hook → 回填模型。插件投影不会放宽总预算，未通过审查的结果不会交给后续工具。资产选择也只能引用工具从已审查结果中声明的 ID。
+
+网页 URL 允许范围、搜索结果字段及压缩方式由网页工具插件实现，核心不识别 `web_search`、`web_fetch` 或第三方工具的私有格式。模型 codec 与默认插件也由 daemon 装配；`packages/core`、`packages/ai-runtime` 和 SDK 不反向导入具体 `plugins/` 实现。架构回归会检查这一依赖方向。
+
 替换数据引擎由启动装配层传 `createApp(dataDir, {storage})`，实现 `StorageProvider` 的原子 CAS 批量写入、条件读取、删除和关闭，以及按 key 稳定排序的 `scan(kind, after, limit)`。扫描不能只按时间分页，否则相同时间的队列记录会遗漏。普通插件不接触该对象。底层 SQLite/Drizzle 插件是唯一数据库所有者；内置素材插件经核心资产服务查询。插件自带的独立外部存储不由 Mimic 提供底层访问能力。
 
 长期记忆的本地 outbox、幂等键、源消息映射、重试和日志由核心 MemoryService 持有；远程协议和事件编码由记忆插件实现。默认提供 [MemStation 插件](memstation.md)。替换提供方时，旧作业会因绑定指纹变化停止，不能自动写入新的后端。

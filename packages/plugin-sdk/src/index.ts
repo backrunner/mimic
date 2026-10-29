@@ -14,6 +14,8 @@ export type {
   MemoryProvider,
   Hook,
   StorageProvider,
+  SafetyProvider,
+  ToolExecutionScope,
 } from '../../contracts/src/index.js';
 export class HookRegistry {
   #hooks: Hook[] = [];
@@ -52,7 +54,13 @@ export class HookRegistry {
     return { allow: true };
   }
 }
-export type { MimicPlugin, PluginRegistrar, ExecutionContext } from './host.js';
+export type {
+  MimicPlugin,
+  PluginRegistrar,
+  ExecutionContext,
+  ToolExecutionContext,
+  SafetyExecutionContext,
+} from './host.js';
 export interface PluginServices {
   settings: { get(key: string): Promise<unknown> };
   data: {
